@@ -1,0 +1,106 @@
+{
+  "name": "Procurement Risk Scorer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8080/api/suppliers",
+        "options": {}
+      },
+      "name": "GET Suppliers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only suppliers that have no risk score yet\nreturn $input.all().filter(item => item.json.riskScore === null || item.json.riskScore === undefined);"
+      },
+      "name": "Filter Unscored",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 256,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a procurement risk analyst. Given supplier name '{{ $json.name }}' from country '{{ $json.country }}', return a JSON object with fields: score (integer 0-100 where 100 = highest risk) and reasoning (one sentence). Respond with raw JSON only, no markdown.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "name": "Call Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.item.json.content[0].text.trim();\nconst parsed = JSON.parse(rawText);\n\nreturn [\n  {\n    json: {\n      supplierId: $('Filter Unscored').item.json.id,\n      riskScore: parsed.score,\n      reasoning: parsed.reasoning\n    }\n  }\n];"
+      },
+      "name": "Parse Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:8080/api/suppliers/{{ $json.supplierId }}/score",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ riskScore: $json.riskScore }) }}",
+        "options": {}
+      },
+      "name": "POST Score to API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "GET Suppliers", "type": "main", "index": 0 }]]
+    },
+    "GET Suppliers": {
+      "main": [[{ "node": "Filter Unscored", "type": "main", "index": 0 }]]
+    },
+    "Filter Unscored": {
+      "main": [[{ "node": "Call Claude API", "type": "main", "index": 0 }]]
+    },
+    "Call Claude API": {
+      "main": [[{ "node": "Parse Score", "type": "main", "index": 0 }]]
+    },
+    "Parse Score": {
+      "main": [[{ "node": "POST Score to API", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,140 @@
+import type { Supplier } from "../types/supplier";
+
+interface Props {
+  supplier: Supplier;
+  onClose: () => void;
+}
+
+function getRiskLevel(score: number | null): { label: string; color: string; bg: string; desc: string } {
+  if (score === null) return { label: "Pending", color: "#6b7280", bg: "#f3f4f6", desc: "Awaiting AI risk assessment." };
+  if (score < 33) return { label: "Low Risk", color: "#16a34a", bg: "#dcfce7", desc: "Supplier poses minimal procurement risk. Suitable for standard engagement." };
+  if (score < 66) return { label: "Medium Risk", color: "#ca8a04", bg: "#fef9c3", desc: "Moderate risk detected. Consider due diligence before large contracts." };
+  return { label: "High Risk", color: "#dc2626", bg: "#fee2e2", desc: "Elevated risk profile. Enhanced scrutiny and risk mitigation recommended." };
+}
+
+function RiskMeter({ score }: { score: number | null }) {
+  const pct = score ?? 0;
+  const color = pct < 33 ? "#16a34a" : pct < 66 ? "#ca8a04" : "#dc2626";
+
+  return (
+    <div style={{ marginTop: "8px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#6b7280", marginBottom: "4px" }}>
+        <span>0 — Low</span>
+        <span>50</span>
+        <span>High — 100</span>
+      </div>
+      <div style={{ height: "12px", background: "#e5e7eb", borderRadius: "6px", overflow: "hidden" }}>
+        <div style={{
+          height: "100%",
+          width: score !== null ? `${pct}%` : "0%",
+          background: color,
+          borderRadius: "6px",
+          transition: "width 0.5s ease",
+        }} />
+      </div>
+      {score !== null && (
+        <div style={{ textAlign: "right", fontSize: "0.75rem", color, fontWeight: 600, marginTop: "2px" }}>
+          {pct.toFixed(1)} / 100
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SupplierDetail({ supplier, onClose }: Props) {
+  const risk = getRiskLevel(supplier.riskScore);
+
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={modal} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "1.4rem" }}>{supplier.name}</h2>
+            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: "0.9rem" }}>🌏 {supplier.country}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "#6b7280" }}>✕</button>
+        </div>
+
+        {/* Risk Score Card */}
+        <div style={{ background: risk.bg, border: `1px solid ${risk.color}30`, borderRadius: "12px", padding: "20px", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+            <span style={{
+              background: risk.color,
+              color: "#fff",
+              padding: "4px 14px",
+              borderRadius: "20px",
+              fontWeight: 700,
+              fontSize: "1.1rem",
+            }}>
+              {supplier.riskScore !== null ? supplier.riskScore.toFixed(1) : "—"}
+            </span>
+            <span style={{ fontWeight: 600, color: risk.color, fontSize: "1rem" }}>{risk.label}</span>
+          </div>
+
+          <RiskMeter score={supplier.riskScore} />
+
+          <p style={{ margin: "12px 0 0", color: "#374151", fontSize: "0.875rem" }}>{risk.desc}</p>
+        </div>
+
+        {/* Claude Reasoning */}
+        <div style={{ marginBottom: "16px" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+            AI Reasoning (Claude)
+          </div>
+          <div style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "8px",
+            padding: "12px 14px",
+            fontSize: "0.875rem",
+            color: supplier.reasoning ? "#1e293b" : "#94a3b8",
+            fontStyle: supplier.reasoning ? "normal" : "italic",
+            lineHeight: 1.6,
+          }}>
+            {supplier.reasoning ?? "Reasoning will appear after the AI scores this supplier."}
+          </div>
+        </div>
+
+        {/* Details Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <DetailCard label="Supplier Name" value={supplier.name} />
+          <DetailCard label="Country" value={supplier.country} />
+          <DetailCard label="Risk Score" value={supplier.riskScore !== null ? `${supplier.riskScore.toFixed(1)} / 100` : "Pending"} />
+          <DetailCard label="Risk Level" value={risk.label} valueColor={risk.color} />
+        </div>
+
+        <p style={{ marginTop: "20px", fontSize: "0.75rem", color: "#9ca3af", textAlign: "center" }}>
+          Score generated by Claude AI (<code>claude-sonnet-4-6</code>) via n8n automation
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function DetailCard({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div style={{ background: "#f9fafb", borderRadius: "8px", padding: "12px" }}>
+      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: "4px" }}>{label}</div>
+      <div style={{ fontWeight: 600, color: valueColor ?? "#111827" }}>{value}</div>
+    </div>
+  );
+}
+
+const overlay: React.CSSProperties = {
+  position: "fixed", inset: 0,
+  background: "rgba(0,0,0,0.4)",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  zIndex: 1000,
+};
+
+const modal: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: "16px",
+  padding: "28px",
+  width: "100%",
+  maxWidth: "500px",
+  boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+  maxHeight: "90vh",
+  overflowY: "auto",
+};

@@ -1,0 +1,6 @@
+@ProcurementRisk.API_HostAddress = http://localhost:5278
+
+GET {{ProcurementRisk.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: procurement_sqlserver
+    environment:
+      SA_PASSWORD: "${SA_PASSWORD}"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ${SA_PASSWORD} -Q 'SELECT 1' -No"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: ./src
+      dockerfile: ProcurementRisk.API/Dockerfile
+    container_name: procurement_api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=ProcurementRiskDb;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True;"
+      AllowedOrigins: "http://localhost:3000"
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8080
+    container_name: procurement_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+  # n8n is already running separately at http://localhost:5678
+  # Import n8n/workflow.json into the existing n8n instance
+
+volumes:
+  sqlserver_data:
+  n8n_data:

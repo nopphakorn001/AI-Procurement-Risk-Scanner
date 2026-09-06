@@ -25,3 +25,13 @@ The product is usable as a local evidence-recording workspace. It is not yet an 
 - The POC explicitly preserves `UNKNOWN`, `NO_DATA`, `PARTIAL`, `NOT_CONNECTED` and `COLLECT_EVIDENCE` states and prevents a misleading aggregate score when evidence is incomplete.
 - No functional runtime, backend, provider connection, procurement action, supplier outreach or money flow changed.
 - Product maturity remains `M1_LOCAL_STANDALONE_READY`; design maturity is `CORE_IMAGE_POC_BATCH_1_READY_FOR_REVIEW`.
+
+## M2 evidence provenance — 2026-09-06
+
+- Structured supplier evidence now persists source type/reference, observed time, reviewer, confidence, risk value, summary and freshness across five weighted risk factors.
+- Deterministic calculation is centralized: missing or stale evidence keeps aggregate risk `UNKNOWN`; 100% fresh factor coverage is required before a provisional score can exist.
+- Recommendations are limited to `COLLECT_EVIDENCE` or `OWNER_REVIEW`; the runtime does not approve or reject suppliers.
+- Legacy manual score writes are blocked with `409 MANUAL_SCORE_DISABLED_USE_EVIDENCE`.
+- API contract `0.2.0`, evidence endpoints, additive SQL Server migration, backward-compatible local SQLite schema upgrade, and evidence-governed UI are verified.
+- Domain tests 8/8, solution build, frontend build, API integration, UI E2E, responsive smoke and restart/recovery pass. Synthetic test data was removed.
+- Maturity: `M2_EVIDENCE_PROVENANCE_READY`. AI and automation remain `NOT_CONNECTED`.

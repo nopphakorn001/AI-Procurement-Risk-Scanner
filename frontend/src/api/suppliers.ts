@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Supplier } from "../types/supplier";
+import type { RiskFactor, RiskSummary, Supplier, SupplierEvidence } from "../types/supplier";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
@@ -20,6 +20,9 @@ export const suppliersApi = {
 
   score: (id: string, payload: { riskScore: number; reasoning: string }): Promise<void> =>
     http.post(`/suppliers/${id}/score`, payload).then(() => undefined),
+  getEvidence: (id: string): Promise<SupplierEvidence[]> => http.get<SupplierEvidence[]>(`/suppliers/${id}/evidence`).then((r) => r.data),
+  addEvidence: (id: string, payload: { factor:RiskFactor; sourceType:string; sourceReference:string; observedAtUtc:string; reviewer:string; confidence:number; riskValue:number; summary:string }): Promise<{id:string}> => http.post<{id:string}>(`/suppliers/${id}/evidence`, payload).then((r) => r.data),
+  getRiskSummary: (id: string): Promise<RiskSummary> => http.get<RiskSummary>(`/suppliers/${id}/risk-summary`).then((r) => r.data),
 };
 
 export interface ProductStatus {
@@ -29,9 +32,11 @@ export interface ProductStatus {
   runtime: string;
   database: string;
   supplierCount: number;
+  evidenceCount: number;
   aiConnector: string;
   automationConnector: string;
   dataQuality: string;
+  scorePolicy: string;
 }
 
 export const statusApi = {

@@ -8,7 +8,7 @@ Supplier CRUD, evidence/rationale scoring, SQLite, truthful connector state, hid
 
 Core screens 01–08 are rendered from deterministic HTML/CSS with explicit evidence states, provenance, maker/checker/owner boundaries and non-calculation of missing data. This is a design artifact only; functional M2 work starts after design acceptance.
 
-## M2 — Evidence provenance
+## M2 — Evidence provenance (`PASS`)
 
 Persist source URL/type, observation timestamp, reviewer, confidence, freshness and structured risk factors. Calculate deterministic explainable scores without paid AI.
 

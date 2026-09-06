@@ -36,6 +36,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ISupplierRepository, SupplierRepository>();
+        services.AddScoped<ISupplierEvidenceRepository, SupplierEvidenceRepository>();
 
         return services;
     }

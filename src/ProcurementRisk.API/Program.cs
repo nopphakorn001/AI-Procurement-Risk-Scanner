@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProcurementRisk.Application.Suppliers.Commands.CreateSupplier;
 using ProcurementRisk.Infrastructure;
 using ProcurementRisk.Infrastructure.Persistence;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,8 @@ builder.Services.AddMediatR(cfg =>
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks();
@@ -33,6 +35,24 @@ using (var scope = app.Services.CreateScope())
     if (provider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
     {
         db.Database.EnsureCreated();
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SupplierEvidence" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_SupplierEvidence" PRIMARY KEY,
+                "SupplierId" TEXT NOT NULL,
+                "Factor" TEXT NOT NULL,
+                "SourceType" TEXT NOT NULL,
+                "SourceReference" TEXT NOT NULL,
+                "ObservedAtUtc" TEXT NOT NULL,
+                "Reviewer" TEXT NOT NULL,
+                "Confidence" TEXT NOT NULL,
+                "RiskValue" TEXT NOT NULL,
+                "Summary" TEXT NOT NULL,
+                "CreatedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "FK_SupplierEvidence_Suppliers_SupplierId" FOREIGN KEY ("SupplierId") REFERENCES "Suppliers" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_SupplierEvidence_SupplierId_Factor_ObservedAtUtc"
+                ON "SupplierEvidence" ("SupplierId", "Factor", "ObservedAtUtc");
+            """);
     }
     else
     {
@@ -69,16 +89,18 @@ app.MapHealthChecks("/health");
 app.MapGet("/api/status", async (AppDbContext db, IConfiguration configuration, CancellationToken ct) => new
 {
     productId = "AIProcurementRiskScanner",
-    contractVersion = "0.1.0",
+    contractVersion = "0.2.0",
     status = "READY",
     runtime = "LOCAL_STANDALONE",
     database = configuration["DatabaseProvider"] ?? "SqlServer",
     supplierCount = await db.Suppliers.CountAsync(ct),
+    evidenceCount = await db.SupplierEvidence.CountAsync(ct),
     aiConnector = "NOT_CONNECTED",
     automationConnector = "NOT_CONNECTED",
     moneyMoved = false,
     externalActions = 0,
-    dataQuality = "PARTIAL"
+    dataQuality = await db.SupplierEvidence.AnyAsync(ct) ? "PARTIAL" : "NO_DATA",
+    scorePolicy = "UNKNOWN_UNTIL_FULL_FRESH_EVIDENCE"
 });
 app.MapControllers();
 app.Run();

@@ -5,6 +5,8 @@ using ProcurementRisk.Application.Suppliers.Commands.DeleteSupplier;
 using ProcurementRisk.Application.Suppliers.Commands.ScoreSupplier;
 using ProcurementRisk.Application.Suppliers.Commands.UpdateSupplier;
 using ProcurementRisk.Application.Suppliers.Queries.GetAllSuppliers;
+using ProcurementRisk.Application.Evidence;
+using ProcurementRisk.Domain.Entities;
 
 namespace ProcurementRisk.API.Controllers;
 
@@ -72,18 +74,61 @@ public class SuppliersController : ControllerBase
     [HttpPost("{id:guid}/score")]
     public async Task<IActionResult> Score(Guid id, [FromBody] ScoreRequest request, CancellationToken ct)
     {
+        await Task.CompletedTask;
+        return Conflict(new
+        {
+            error = "MANUAL_SCORE_DISABLED_USE_EVIDENCE",
+            message = "M2 scores are calculated from complete, fresh structured evidence. Record evidence instead."
+        });
+    }
+
+    [HttpGet("{id:guid}/evidence")]
+    public async Task<IActionResult> GetEvidence(Guid id, CancellationToken ct)
+    {
         try
         {
-            await _mediator.Send(new ScoreSupplierCommand(id, request.RiskScore, request.Reasoning), ct);
-            return NoContent();
+            var result = await _mediator.Send(new GetSupplierEvidenceQuery(id), ct);
+            return Ok(result);
         }
         catch (KeyNotFoundException)
         {
             return NotFound();
         }
-        catch (ArgumentOutOfRangeException ex)
+    }
+
+    [HttpPost("{id:guid}/evidence")]
+    public async Task<IActionResult> AddEvidence(Guid id, [FromBody] AddEvidenceRequest request, CancellationToken ct)
+    {
+        if (!Enum.TryParse<RiskFactor>(request.Factor, true, out var factor))
+            return BadRequest(new { error = "RISK_FACTOR_INVALID", allowed = Enum.GetNames<RiskFactor>() });
+
+        try
         {
-            return BadRequest(ex.Message);
+            var evidenceId = await _mediator.Send(new AddSupplierEvidenceCommand(
+                id, factor, request.SourceType, request.SourceReference, request.ObservedAtUtc,
+                request.Reviewer, request.Confidence, request.RiskValue, request.Summary), ct);
+            return Created($"/api/suppliers/{id}/evidence/{evidenceId}", new { id = evidenceId });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/risk-summary")]
+    public async Task<IActionResult> GetRiskSummary(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await _mediator.Send(new GetRiskSummaryQuery(id), ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
     }
 }
@@ -91,3 +136,12 @@ public class SuppliersController : ControllerBase
 public record CreateSupplierRequest(string Name, string Country);
 public record UpdateSupplierRequest(string Name, string Country);
 public record ScoreRequest(decimal RiskScore, string? Reasoning);
+public record AddEvidenceRequest(
+    string Factor,
+    string SourceType,
+    string SourceReference,
+    DateTime ObservedAtUtc,
+    string Reviewer,
+    decimal Confidence,
+    decimal RiskValue,
+    string Summary);

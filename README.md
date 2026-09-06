@@ -4,10 +4,11 @@ Standalone local supplier-risk workspace. It stores supplier records, allows an 
 
 ## Current maturity
 
-`M1_LOCAL_STANDALONE_READY`
+`M2_EVIDENCE_PROVENANCE_READY`
 
 - Local SQLite is the default development database; SQL Server remains available for Docker deployments.
-- Supplier CRUD and explicit assessment recording are available.
+- Supplier CRUD and structured evidence provenance are available.
+- Explainable scores remain `UNKNOWN` until all weighted factors have fresh evidence; complete evidence produces only a provisional owner-review score.
 - `/health` and `/api/status` expose runtime truth.
 - Paid AI and n8n are `NOT_CONNECTED` by default. The product does not imply that an unconfigured connector produced a score.
 - No purchasing, supplier outreach, contract decision, or money movement is automated.

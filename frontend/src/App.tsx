@@ -1,92 +1,29 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { statusApi, suppliersApi, type ProductStatus } from "./api/suppliers";
-import { SupplierForm } from "./components/SupplierForm";
-import { SupplierTable } from "./components/SupplierTable";
-import type { Supplier } from "./types/supplier";
+import type { RiskFactor, RiskSummary, Supplier, SupplierEvidence } from "./types/supplier";
 
-const REFRESH_INTERVAL_MS = 30_000;
+const labels: Record<RiskFactor,string>={Identity:"Identity & ownership",FinancialStability:"Financial stability",OperationalCapacity:"Operational capacity",Compliance:"Compliance",SupplyContinuity:"Supply continuity"};
+const factors=Object.keys(labels) as RiskFactor[];
+type Tab="overview"|"evidence"|"score";
+const Badge=({text,tone=""}:{text:string;tone?:string})=><span className={`badge ${tone}`}>{text}</span>;
 
-export default function App() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<ProductStatus | null>(null);
-
-  const loadSuppliers = useCallback(async () => {
-    try {
-      const data = await suppliersApi.getAll();
-      setSuppliers(data);
-      setStatus(await statusApi.get());
-      setError(null);
-    } catch {
-      setError("Failed to load suppliers. Is the API running?");
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSuppliers();
-    const interval = setInterval(loadSuppliers, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [loadSuppliers]);
-
-  const handleCreate = async (data: { name: string; country: string }) => {
-    await suppliersApi.create(data);
-    setShowAddForm(false);
-    await loadSuppliers();
-  };
-
-  const handleUpdate = async (id: string, data: { name: string; country: string }) => {
-    await suppliersApi.update(id, data);
-    await loadSuppliers();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this supplier?")) return;
-    await suppliersApi.remove(id);
-    await loadSuppliers();
-  };
-
-  const handleScore = async (id: string, data: { riskScore: number; reasoning: string }) => {
-    await suppliersApi.score(id, data);
-    await loadSuppliers();
-  };
-
-  return (
-    <div style={{ maxWidth: "900px", margin: "40px auto", padding: "0 16px", fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>Procurement Risk Scanner</h1>
-        <button onClick={() => setShowAddForm(!showAddForm)}>
-          {showAddForm ? "Cancel" : "+ Add Supplier"}
-        </button>
-      </div>
-
-      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "12px", marginBottom: "18px", fontSize: "0.85rem" }}>
-        <b>Local standalone:</b> {status?.status ?? "CONNECTING"} · Database {status?.database ?? "UNKNOWN"} · AI {status?.aiConnector ?? "UNKNOWN"} · Automation {status?.automationConnector ?? "UNKNOWN"}
-        <div style={{ color: "#475569", marginTop: "4px" }}>Scores are recorded only from explicit evidence. No paid AI or external automation is connected.</div>
-      </div>
-
-      {error && (
-        <div style={{ background: "#fee2e2", color: "#dc2626", padding: "12px", borderRadius: "6px", marginBottom: "16px" }}>
-          {error}
-        </div>
-      )}
-
-      {showAddForm && (
-        <div style={{ marginBottom: "24px", padding: "16px", background: "#f9fafb", borderRadius: "8px" }}>
-          <SupplierForm onSubmit={handleCreate} onCancel={() => setShowAddForm(false)} />
-        </div>
-      )}
-
-      <SupplierTable
-        suppliers={suppliers}
-        onUpdate={handleUpdate}
-        onDelete={handleDelete}
-        onScore={handleScore}
-      />
-
-      <p style={{ color: "#9ca3af", fontSize: "0.75rem", marginTop: "16px" }}>
-        Local data refreshes every 30 seconds. Optional AI and n8n connectors remain NOT_CONNECTED until separately configured and approved.
-      </p>
-    </div>
-  );
+export default function App(){
+ const [suppliers,setSuppliers]=useState<Supplier[]>([]),[selectedId,setSelectedId]=useState<string|null>(null),[evidence,setEvidence]=useState<SupplierEvidence[]>([]),[summary,setSummary]=useState<RiskSummary|null>(null),[status,setStatus]=useState<ProductStatus|null>(null);
+ const [tab,setTab]=useState<Tab>("overview"),[supplierModal,setSupplierModal]=useState(false),[evidenceModal,setEvidenceModal]=useState(false),[error,setError]=useState<string|null>(null);
+ const loadSuppliers=useCallback(async()=>{try{const [items,runtime]=await Promise.all([suppliersApi.getAll(),statusApi.get()]);setSuppliers(items);setStatus(runtime);setSelectedId(current=>current&&items.some(x=>x.id===current)?current:items[0]?.id??null);setError(null);}catch{setError("เชื่อมต่อ API ไม่สำเร็จ กรุณาตรวจ local runtime");}},[]);
+ const loadWorkspace=useCallback(async(id:string)=>{try{const [items,risk]=await Promise.all([suppliersApi.getEvidence(id),suppliersApi.getRiskSummary(id)]);setEvidence(items);setSummary(risk);setError(null);}catch{setError("โหลด evidence workspace ไม่สำเร็จ");}},[]);
+ useEffect(()=>{loadSuppliers()},[loadSuppliers]); useEffect(()=>{if(selectedId)loadWorkspace(selectedId);else{setEvidence([]);setSummary(null)}},[selectedId,loadWorkspace]);
+ const selected=useMemo(()=>suppliers.find(x=>x.id===selectedId)??null,[suppliers,selectedId]);
+ return <div className="shell"><aside><div className="brand"><span>PR</span><div><b>Procurement Risk</b><small>Evidence workspace</small></div></div><h4>SUPPLIERS</h4><button className="new" onClick={()=>setSupplierModal(true)}>+ เพิ่ม Supplier</button><div className="supplier-list">{suppliers.map(x=><button key={x.id} className={x.id===selectedId?"active":""} onClick={()=>setSelectedId(x.id)}><b>{x.name}</b><small>{x.country} · {x.riskScore===null?"UNKNOWN":"LEGACY SCORE"}</small></button>)}</div><div className="runtime"><i/> {status?.status??"CONNECTING"}<small>DB {status?.database??"UNKNOWN"}<br/>AI {status?.aiConnector??"UNKNOWN"}<br/>Automation {status?.automationConnector??"UNKNOWN"}</small></div></aside><main><header><div><small>AI PROCUREMENT RISK SCANNER / M2</small><h1>{selected?.name??"Supplier evidence workspace"}</h1></div><span>Contract {status?.contractVersion??"—"}</span></header><div className="truth"><b>Evidence-governed local runtime</b><span>คะแนน M2 มาจาก structured evidence ครบ 100% · ไม่มี AI หรือ external automation</span></div>{error&&<div className="error">{error}</div>}{selected?<><nav className="tabs">{(["overview","evidence","score"] as Tab[]).map(x=><button key={x} className={tab===x?"active":""} onClick={()=>setTab(x)}>{x==="overview"?"ภาพรวม":x==="evidence"?`หลักฐาน (${evidence.length})`:"Explainable Score"}</button>)}</nav><section>{tab==="overview"&&<Overview supplier={selected} evidence={evidence} summary={summary} openEvidence={()=>setTab("evidence")}/>} {tab==="evidence"&&<EvidenceView evidence={evidence} add={()=>setEvidenceModal(true)}/>} {tab==="score"&&<ScoreView summary={summary}/>}</section></>:<section><div className="card empty"><h2>ยังไม่มี Supplier</h2><p>สร้าง supplier draft ก่อน แล้วค่อยบันทึกหลักฐานที่มี source</p><button className="primary" onClick={()=>setSupplierModal(true)}>เพิ่ม Supplier</button></div></section>}</main>{supplierModal&&<SupplierForm close={()=>setSupplierModal(false)} saved={async id=>{setSupplierModal(false);await loadSuppliers();setSelectedId(id)}}/>}{evidenceModal&&selected&&<EvidenceForm supplier={selected} close={()=>setEvidenceModal(false)} saved={async()=>{setEvidenceModal(false);await loadWorkspace(selected.id);await loadSuppliers()}}/>}</div>
 }
+
+function Overview({supplier,evidence,summary,openEvidence}:{supplier:Supplier;evidence:SupplierEvidence[];summary:RiskSummary|null;openEvidence:()=>void}){return <><div className="metrics"><div className="card"><small>Overall risk</small><strong>{summary?.riskScore?.toFixed(1)??"—"}</strong><Badge text={summary?.riskScore===null?"UNKNOWN":"PROVISIONAL"}/></div><div className="card"><small>Evidence coverage</small><strong>{summary?.evidenceCoverage??0}%</strong><Badge text={(summary?.evidenceCoverage??0)===100?"COMPLETE":"PARTIAL"} tone={(summary?.evidenceCoverage??0)===100?"green":"amber"}/></div><div className="card"><small>Recommendation</small><strong className="recommend">{summary?.recommendation??"COLLECT_EVIDENCE"}</strong><Badge text="OWNER GOVERNED" tone="amber"/></div></div><div className="columns"><div className="card"><h2>Evidence readiness</h2>{summary?.factors.map(x=><div className="factor" key={x.factor}><div><b>{labels[x.factor]}</b><small>{x.observedAtUtc?`Observed ${new Date(x.observedAtUtc).toLocaleDateString("th-TH")}`:"ยังไม่มีหลักฐานที่สด"}</small></div><span>{x.weight}%</span><Badge text={x.evidenceStatus} tone={x.evidenceStatus==="RECORDED"?"green":x.evidenceStatus==="STALE"?"red":""}/></div>)}</div><div className="card next"><h2>Next best action</h2><div className="callout"><b>{summary?.recommendation??"COLLECT_EVIDENCE"}</b><p>{summary?.riskScore===null?"เพิ่มหลักฐานที่ตรวจย้อนกลับได้ให้ครบทุก factor ก่อนแสดงคะแนน":"ส่งผล provisional ให้ Owner ตรวจ ไม่ใช่ supplier approval"}</p></div><dl><dt>Supplier</dt><dd>{supplier.name}</dd><dt>Evidence records</dt><dd>{evidence.length}</dd><dt>Manual scoring</dt><dd>DISABLED</dd></dl><button className="primary" onClick={openEvidence}>จัดการหลักฐาน</button></div></div></>}
+
+function EvidenceView({evidence,add}:{evidence:SupplierEvidence[];add:()=>void}){return <div className="card"><div className="section-head"><div><h2>Supplier Evidence</h2><p>Source, observed time, reviewer, confidence และ freshness ต้องแสดงครบ</p></div><button className="primary" onClick={add}>+ เพิ่มหลักฐาน</button></div>{evidence.length===0?<div className="empty">ยังไม่มีหลักฐาน<br/><Badge text="NO_DATA"/></div>:<div className="evidence-list">{evidence.map(x=><article key={x.id}><div><Badge text={x.freshness} tone={x.freshness==="FRESH"?"green":"red"}/><h3>{labels[x.factor]}</h3><p>{x.summary}</p><small>{x.sourceType} · {x.sourceReference}</small></div><dl><dt>Observed</dt><dd>{new Date(x.observedAtUtc).toLocaleString("th-TH")}</dd><dt>Reviewer</dt><dd>{x.reviewer}</dd><dt>Confidence</dt><dd>{x.confidence}%</dd><dt>Risk value</dt><dd>{x.riskValue}/100</dd></dl></article>)}</div>}</div>}
+
+function ScoreView({summary}:{summary:RiskSummary|null}){return <div className="columns score-layout"><div className="card"><h2>Risk factor breakdown</h2><p>UNKNOWN ไม่ถูกแทนด้วยศูนย์ และ contribution แสดงเมื่อ evidence ครบเท่านั้น</p><div className="score-table">{summary?.factors.map(x=><div className="score-row" key={x.factor}><b>{labels[x.factor]}</b><span>{x.weight}%</span><span>{x.riskValue??"UNKNOWN"}</span><Badge text={x.evidenceStatus} tone={x.evidenceStatus==="RECORDED"?"green":x.evidenceStatus==="STALE"?"red":""}/><span>{x.contribution?.toFixed(1)??"ไม่คำนวณ"}</span></div>)}</div><div className="policy"><b>Calculation invariant</b><p>{summary?.calculationPolicy}</p></div></div><div className="card score-card"><small>Overall risk score</small><strong>{summary?.riskScore?.toFixed(1)??"—"}<sup>/100</sup></strong><Badge text={summary?.riskScore===null?"UNKNOWN":"PROVISIONAL"}/><p>Coverage {summary?.evidenceCoverage??0}% / required 100%</p><hr/><h3>{summary?.recommendation}</h3><p>ระบบไม่อนุมัติหรือปฏิเสธ supplier อัตโนมัติ</p></div></div>}
+
+function Modal({title,close,children}:{title:string;close:()=>void;children:React.ReactNode}){return <div className="backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><div className="modal"><div className="modal-head"><h2>{title}</h2><button onClick={close}>×</button></div>{children}</div></div>}
+function SupplierForm({close,saved}:{close:()=>void;saved:(id:string)=>Promise<void>}){const[name,setName]=useState(""),[country,setCountry]=useState(""),[saving,setSaving]=useState(false);return <Modal title="เพิ่ม Supplier" close={close}><form onSubmit={async e=>{e.preventDefault();setSaving(true);try{const x=await suppliersApi.create({name,country});await saved(x.id)}finally{setSaving(false)}}}><label>ชื่อ Supplier<input required value={name} onChange={e=>setName(e.target.value)}/></label><label>ประเทศ<input required value={country} onChange={e=>setCountry(e.target.value)}/></label><p className="note">สร้างเป็น draft เท่านั้น ไม่ถือว่า identity verified และไม่สร้างคะแนน</p><Actions close={close} saving={saving} label="สร้าง Draft"/></form></Modal>}
+function EvidenceForm({supplier,close,saved}:{supplier:Supplier;close:()=>void;saved:()=>Promise<void>}){const[factor,setFactor]=useState<RiskFactor>("Identity"),[sourceType,setSourceType]=useState("PUBLIC_URL"),[sourceReference,setSourceReference]=useState(""),[observed,setObserved]=useState(new Date().toISOString().slice(0,16)),[reviewer,setReviewer]=useState(""),[confidence,setConfidence]=useState(""),[riskValue,setRiskValue]=useState(""),[summary,setSummary]=useState(""),[saving,setSaving]=useState(false),[error,setError]=useState<string|null>(null);return <Modal title={`เพิ่มหลักฐาน · ${supplier.name}`} close={close}><form onSubmit={async e=>{e.preventDefault();setSaving(true);setError(null);try{await suppliersApi.addEvidence(supplier.id,{factor,sourceType,sourceReference,observedAtUtc:new Date(observed).toISOString(),reviewer,confidence:Number(confidence),riskValue:Number(riskValue),summary});await saved()}catch{setError("บันทึกไม่สำเร็จ ตรวจ source และค่าที่กรอก")}finally{setSaving(false)}}}><div className="form-grid"><label>Risk factor<select value={factor} onChange={e=>setFactor(e.target.value as RiskFactor)}>{factors.map(x=><option key={x}>{x}</option>)}</select></label><label>Source type<select value={sourceType} onChange={e=>setSourceType(e.target.value)}><option>PUBLIC_URL</option><option>INTERNAL_RECORD</option><option>UPLOADED_DOCUMENT</option></select></label><label className="full">Source URL / reference<input required maxLength={1000} value={sourceReference} onChange={e=>setSourceReference(e.target.value)}/></label><label>Observed at<input required type="datetime-local" value={observed} onChange={e=>setObserved(e.target.value)}/></label><label>Reviewer<input required maxLength={160} value={reviewer} onChange={e=>setReviewer(e.target.value)}/></label><label>Confidence 0–100<input required type="number" min="0" max="100" step="0.1" value={confidence} onChange={e=>setConfidence(e.target.value)}/></label><label>Risk value 0–100<input required type="number" min="0" max="100" step="0.1" value={riskValue} onChange={e=>setRiskValue(e.target.value)}/></label><label className="full">Evidence summary<textarea required maxLength={2000} value={summary} onChange={e=>setSummary(e.target.value)}/></label></div>{error&&<div className="error">{error}</div>}<p className="note">Evidence record นี้ไม่ใช่ AI output และยังไม่ใช่ supplier approval</p><Actions close={close} saving={saving} label="บันทึกหลักฐาน"/></form></Modal>}
+function Actions({close,saving,label}:{close:()=>void;saving:boolean;label:string}){return <div className="actions"><button type="button" onClick={close}>ยกเลิก</button><button className="primary" disabled={saving}>{saving?"กำลังบันทึก…":label}</button></div>}

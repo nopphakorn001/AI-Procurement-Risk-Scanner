@@ -4,6 +4,7 @@
 
 - Canonical repository: `D:\Product\AI-Procurement-Risk-Scanner`.
 - Branch: `codex/aicompanyos-onboarding`.
+- Verified pushed commit: `987cdca`.
 - Product identity: `AIProcurementRiskScanner`; product type `SOFTWARE`.
 - Local UI: `http://127.0.0.1:8783/`; API: `http://127.0.0.1:8784/`.
 - SQLite development storage, supplier CRUD, explicit score/rationale recording, health and read-only control status are ready.

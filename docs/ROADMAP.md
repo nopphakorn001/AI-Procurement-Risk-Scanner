@@ -4,6 +4,10 @@
 
 Supplier CRUD, evidence/rationale scoring, SQLite, truthful connector state, hidden start/stop, health contract, tests and AICompanyOS control-plane onboarding.
 
+## Design gate — Core Image POC Batch 1 (`READY_FOR_DESIGN_REVIEW`)
+
+Core screens 01–08 are rendered from deterministic HTML/CSS with explicit evidence states, provenance, maker/checker/owner boundaries and non-calculation of missing data. This is a design artifact only; functional M2 work starts after design acceptance.
+
 ## M2 — Evidence provenance
 
 Persist source URL/type, observation timestamp, reviewer, confidence, freshness and structured risk factors. Calculate deterministic explainable scores without paid AI.

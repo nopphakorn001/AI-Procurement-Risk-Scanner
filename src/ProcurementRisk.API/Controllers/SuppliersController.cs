@@ -26,8 +26,15 @@ public class SuppliersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request, CancellationToken ct)
     {
-        var id = await _mediator.Send(new CreateSupplierCommand(request.Name, request.Country), ct);
-        return CreatedAtAction(nameof(GetAll), new { id }, new { id });
+        try
+        {
+            var id = await _mediator.Send(new CreateSupplierCommand(request.Name, request.Country), ct);
+            return CreatedAtAction(nameof(GetAll), new { id }, new { id });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -41,6 +48,10 @@ public class SuppliersController : ControllerBase
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 

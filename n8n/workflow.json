@@ -74,7 +74,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ riskScore: $json.riskScore }) }}",
+        "jsonBody": "={{ JSON.stringify({ riskScore: $json.riskScore, reasoning: $json.reasoning }) }}",
         "options": {}
       },
       "name": "POST Score to API",

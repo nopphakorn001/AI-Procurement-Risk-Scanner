@@ -17,4 +17,23 @@ export const suppliersApi = {
 
   remove: (id: string): Promise<void> =>
     http.delete(`/suppliers/${id}`).then(() => undefined),
+
+  score: (id: string, payload: { riskScore: number; reasoning: string }): Promise<void> =>
+    http.post(`/suppliers/${id}/score`, payload).then(() => undefined),
+};
+
+export interface ProductStatus {
+  productId: string;
+  contractVersion: string;
+  status: string;
+  runtime: string;
+  database: string;
+  supplierCount: number;
+  aiConnector: string;
+  automationConnector: string;
+  dataQuality: string;
+}
+
+export const statusApi = {
+  get: (): Promise<ProductStatus> => http.get<ProductStatus>("/status").then((r) => r.data),
 };

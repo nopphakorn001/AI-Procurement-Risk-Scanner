@@ -12,6 +12,10 @@ dist/
 # logs
 logs/
 *.log
+*.db
+*.db-shm
+*.db-wal
+.runtime/
 
 # IDE
 .vscode/

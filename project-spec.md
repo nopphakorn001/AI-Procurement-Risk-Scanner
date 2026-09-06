@@ -4,12 +4,11 @@ Goal:
 AI Procurement Risk Scanner
 
 Architecture:
-.NET 9 Clean Architecture
-SQL Server
-Docker
-React
-n8n automation
-AI Risk scoring
+.NET 8 Clean Architecture
+SQLite local development / SQL Server Docker option
+React + Vite standalone UI
+Optional n8n automation (NOT_CONNECTED by default)
+Evidence-backed risk assessment; optional AI connector is a later governed milestone
 
 Database:
 Suppliers
@@ -19,7 +18,10 @@ Suppliers
 - RiskScore
 
 API:
-POST /supplier
-GET /supplier
-PUT /supplier
-DELETE /supplier
+GET /health
+GET /api/status
+POST /api/suppliers
+GET /api/suppliers
+PUT /api/suppliers/{id}
+DELETE /api/suppliers/{id}
+POST /api/suppliers/{id}/score
